@@ -1,26 +1,43 @@
-// This is your test secret API key.
-const stripe = require('stripe')('sk_test_51HQWcxFHakNNk1d34lfwFDV0UFWrT4xK30qHxHUoEx4RitVs90zTmHs1f6Ux1CGgVPe3XvNEVSlGM65xObxraKJW002xn090p7');
+const stripe = require('stripe')
+  (process.env.STRIPE_SECRET);
 const express = require('express');
 const app = express();
-app.use(express.static('public'));
+const path = require('path');
+const port = process.env.PORT || 3000;
+// app.use(express.static('public'));
+// const YOUR_DOMAIN = 'http://localhost:3000';
 
-const YOUR_DOMAIN = 'http://localhost:4242';
+app.enable('trust proxy');
+app.use(express.static(path.join(__dirname, 'build')));
 
 app.post('/create-checkout-session', async (req, res) => {
   const session = await stripe.checkout.sessions.create({
     line_items: [
       {
         // Provide the exact Price ID (for example, pr_1234) of the product you want to sell
-        price: '{{PRICE_ID}}',
+        price: req.query.priceId,
         quantity: 1,
       },
     ],
     mode: 'payment',
-    success_url: `${YOUR_DOMAIN}/?success=true`,
-    cancel_url: `${YOUR_DOMAIN}?canceled=true`,
+    success_url: `${req.protocol}://${req.hostname}?success=true`,
+    cancel_url: `${req.protocol}://${req.hostname}?canceled=true`,
   });
 
   res.redirect(303, session.url);
 });
 
-app.listen(4242, () => console.log('Running on port 4242'));
+app.get('/get-all-products', async (req, res) => {
+  const products = await stripe.prices.list({
+    limit: 3,
+    active: true,
+    expand: ['data.product']
+  });
+  res.status(200).json(products.data);
+});
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
+app.listen(port, () => console.log(`Running on port ${port}`));
